@@ -4680,7 +4680,7 @@ function Ox(){const H=y.createElement;let e=Sr({from:`/`}),t=Cr(),[n,r]=(0,y.use
    H(Ii,{activeId:c?.id,hidden:s,hoverId:hv,onHover:setHv,onPick:u}),
    H(`section`,{className:`panel`,"aria-live":`polite`},
     c?H(Tx,{key:c.id,street:c,order,onBack:d,onPick:u}):l?H(Ex,{key:`rules`,onBack:d}):H(Dx,{key:`list`,ids:o,activeId:void 0,hoverId:hv,onHover:setHv,query:n,onQuery:r,onPick:u,inputRef:ir,back,onReset:()=>{r(``);a(`all`)}}))))}
-var kx=Gr({component:()=>(0,B.jsx)(ti,{})}),Ax=Ur({getParentRoute:()=>kx,path:`/`,validateSearch:e=>{let t=typeof e.street==`string`?e.street:void 0;return{street:t&&Ai[t]?t:void 0,panel:e.panel===`rules`?`rules`:void 0}},component:Ox}),jx=window.location.protocol===`file:`||window.location.pathname.endsWith(`.html`),Mx=si({routeTree:kx.addChildren([Ax]),history:jx?_t():void 0}),Nx=document.getElementById(`root`);if(!Nx)throw Error(`Не найден #root`);(0,di.createRoot)(Nx).render((0,B.jsx)(y.StrictMode,{children:(0,B.jsx)(ui,{router:Mx})}))})();
+var kx=Gr({component:()=>(0,B.jsx)(ti,{})}),Ax=Ur({getParentRoute:()=>kx,path:`/`,validateSearch:e=>{let t=typeof e.street==`string`?e.street:void 0;return{street:t&&Ai[t]?t:void 0,panel:e.panel===`rules`?`rules`:void 0}},component:Ox}),jx=!0,Mx=si({routeTree:kx.addChildren([Ax]),history:jx?_t():void 0}),Nx=document.getElementById(`root`);if(!Nx)throw Error(`Не найден #root`);(0,di.createRoot)(Nx).render((0,B.jsx)(y.StrictMode,{children:(0,B.jsx)(ui,{router:Mx})}))})();
 </script>
 </body>
 </html>
