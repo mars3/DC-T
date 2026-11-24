@@ -11,16 +11,50 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Download from Overpass
+      - name: Try Overpass
         run: |
           mkdir -p osm
-          Q='[out:json][timeout:180];(way["highway"]["highway"!~"footway|path|track|steps|cycleway|bridleway|construction|proposed|corridor|platform"](43.22,68.13,43.38,68.38);way["railway"="rail"](43.22,68.13,43.38,68.38);way["waterway"~"^(river|canal)$"](43.22,68.13,43.38,68.38););out tags geom;nwr["name"~"Ясави|Яссауи|Ясауи|Yasawi|Yassawi|Yasaw"](43.22,68.13,43.38,68.38);out center tags;'
+          BB='43.22,68.13,43.38,68.38'
+          Q="[out:json][timeout:180];(way[\"highway\"][\"highway\"!~\"footway|path|track|steps|cycleway|bridleway|construction|proposed|corridor|platform\"]($BB);way[\"railway\"=\"rail\"]($BB);way[\"waterway\"~\"^(river|canal)\$\"]($BB););out tags geom;nwr[\"name\"~\"Ясави|Яссауи|Ясауи|Yasawi|Yassawi|Yasaw\"]($BB);out center tags;"
           for u in https://overpass-api.de/api/interpreter https://overpass.private.coffee/api/interpreter https://maps.mail.ru/osm/tools/overpass/api/interpreter; do
-            if curl -sf -m 240 --data-urlencode "data=$Q" "$u" -o osm/turkestan.json && python3 -c "import json;d=json.load(open('osm/turkestan.json'));assert len(d['elements'])>100;print(len(d['elements']))"; then break; fi
+            echo "== $u"
+            code=$(curl -s -m 200 -A "dc-t-street-atlas/1.0 (github.com/mars3/dc-t)" -H "Accept: application/json" --data-urlencode "data=$Q" "$u" -o /tmp/r.json -w '%{http_code}') || true
+            echo "HTTP $code, $(wc -c < /tmp/r.json 2>/dev/null) bytes"; head -c 300 /tmp/r.json 2>/dev/null; echo
+            if [ "$code" = "200" ] && python3 -c "import json;d=json.load(open('/tmp/r.json'));assert len(d['elements'])>100;print(len(d['elements']),'elements')"; then cp /tmp/r.json osm/turkestan.json; break; fi
           done
-          ls -la osm
+      - name: Fallback - Geofabrik extract
+        if: hashFiles('osm/turkestan.json') == ''
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq osmium-tool
+          curl -sSfL -A "dc-t-street-atlas/1.0" -o /tmp/kz.pbf https://download.geofabrik.de/asia/kazakhstan-latest.osm.pbf
+          osmium extract -b 68.13,43.22,68.38,43.38 /tmp/kz.pbf -o /tmp/t.pbf --overwrite
+          osmium tags-filter /tmp/t.pbf w/highway w/railway=rail w/waterway=river,canal nwr/name -o /tmp/f.pbf --overwrite
+          osmium export /tmp/f.pbf -f geojsonseq -o /tmp/f.geojsonseq --overwrite -a type,id
+          python3 - <<'PY'
+          import json, re
+          SKIP = re.compile(r'footway|path|track|steps|cycleway|bridleway|construction|proposed|corridor|platform')
+          NAME = re.compile(r'Ясави|Яссауи|Ясауи|Yasawi|Yassawi|Yasaw')
+          els = []
+          for line in open('/tmp/f.geojsonseq', encoding='utf-8'):
+              line = line.strip().lstrip('\x1e')
+              if not line: continue
+              f = json.loads(line); p = f['properties']; g = f['geometry']
+              tags = {k: v for k, v in p.items() if not k.startswith('@')}
+              if NAME.search(tags.get('name', '') + tags.get('name:en', '')) and g['type'] in ('Polygon', 'MultiPolygon', 'Point'):
+                  ring = g['coordinates'] if g['type'] == 'Point' else (g['coordinates'][0] if g['type'] == 'Polygon' else g['coordinates'][0][0])
+                  pts = [ring] if g['type'] == 'Point' else ring
+                  els.append({'type': 'way', 'id': p.get('@id', 0), 'tags': tags, 'center': {'lat': sum(q[1] for q in pts) / len(pts), 'lon': sum(q[0] for q in pts) / len(pts)}})
+                  continue
+              hw = tags.get('highway')
+              ok = (hw and not SKIP.search(hw)) or tags.get('railway') == 'rail' or tags.get('waterway') in ('river', 'canal')
+              if not ok or g['type'] != 'LineString': continue
+              els.append({'type': 'way', 'id': p.get('@id', 0), 'tags': tags, 'geometry': [{'lat': c[1], 'lon': c[0]} for c in g['coordinates']]})
+          json.dump({'elements': els}, open('osm/turkestan.json', 'w', encoding='utf-8'), ensure_ascii=False)
+          print(len(els), 'elements')
+          PY
       - name: Commit
         run: |
+          ls -la osm
           git config user.name "github-actions[bot]"
           git config user.email "41898299+github-actions[bot]@users.noreply.github.com"
           git add osm/turkestan.json
